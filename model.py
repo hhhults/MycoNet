@@ -1,0 +1,1 @@
+"""A model for a mycelial network."""
