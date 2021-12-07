@@ -63,20 +63,21 @@ class Model:
       # self.c4 = 1e-8
       # self.c5 = 1e-9
       self.Dp = 0.3          # coefficient of diffusive movement
+      self.v = 1             # coefficient of active movement
+
       self.Di = 0.1          # coefficient of diffusive transport
       self.Da = 0.1          # coefficient of active transport
-      self.v = 1             # coefficient of active movement
-      self.b = 2             # branching coefficient
-      self.c1 = 0.03         # coefficient for internal gain of nutreint through uptake
-      self.c2 = 0.01         # growth cost coefficient
+      self.b = 1.5            # branching coefficient
+      self.c1 = 0.015         # coefficient for internal gain of nutrient through uptake
+      self.c2 = 0.2         # growth cost coefficient
       self.c3 = 0.05         # coefficient for environmental loss of nutrient through uptake
-      self.c4 = 0.001        # active translocation cost coefficient
-      self.c5 = 0.001        # coefficient for nutrient loss from hyphal maintenance
+      self.c4 = 0.05        # active translocation cost coefficient
+      self.c5 = 0.01        # coefficient for nutrient loss from hyphal maintenance
       self.omega = 1e-13     # minimum substrate in active hypha
 
       self.zero = np.zeros((n+4,n+4))
       self.one = np.ones((n+4,n+4))
-      self.external_init = 1.5*math.sqrt(3)*1e-5#1e-11
+      self.external_init = 1#1.5*math.sqrt(3)*1e-5#1e-11
       self.precision = np.float16
       self.active = np.zeros((n+4,n+4),dtype=np.int8)
       self.active[1+(n//2),1+(n//2)] = 1
@@ -84,7 +85,6 @@ class Model:
       self.tips = np.zeros((n+4,n+4),dtype=np.int8)
       self.tips[(n//2)+1,(n//2)+1] = 1
       self.orientation = np.where(self.tips,np.mod(np.log2(self.active)+3,6),-1)
-      print(self.orientation)
       self.inCell = np.zeros((n,n),dtype=np.int8)
       self.internal = np.ones((n+4,n+4),dtype=self.precision)
       self.external = np.ones((n+4,n+4),dtype=self.precision)*self.external_init
@@ -99,11 +99,14 @@ class Model:
       return count
 
    def update(self):
+      model.uptake()
       model.grow()
       model.maintain()
       model.translocate()
 
    def grow(self):
+
+      # print(self.internal)
 
       # calculate movement probabilities from internal substrate concentrations
       movementDensity = np.array([diffusion:=self.Dp*self.internal*self.dt*self.dx**(-2), 2*diffusion+(convection:=self.v*self.internal*self.dt*self.dx**(-1)), 3*diffusion+convection])
@@ -191,18 +194,14 @@ class Model:
 
 
    def branch(self, tips_masked):
-      options = []
       probs = rand.rand(self.size+4,self.size+4)
-
-   
       # for each cell
       for j in range(2, self.size+2):
          for i in range(2, self.size+2):
+            options = []
 
             # if our random variable is less than b Si dt and there is a tip
             if probs[i,j]<self.b*self.internal[i,j]*self.dt and (tips_masked[i,j]==1):
-               print("i: %d, j = %d" % (i,j))
-
                # enumerate possible branch directions
                for option in (-1,0,1):
                   num = int(2**((self.orientation[i,j]+option)%6))
@@ -210,7 +209,6 @@ class Model:
                      options.append(option)
                if len(options)==0: # nowhere to branch
                   continue
-               print(options)
 
                # get growth angle
                theta = int((self.orientation[i,j]+random.choice(options)) % 6)
@@ -264,13 +262,19 @@ class Model:
 
    # display
    def display(self, ax):
+      x = []
+      y = []
+      ax.axis([0,self.size+4,0,self.size+4])
       for i in range(2, self.size+2):
          for j in range(2,self.size+2):
             pt = np.array([i*sqrt3half, (j+0.5) if i%2==1 else j])
             lst = [(pt,pt+direc) for direc in self.lines[self.active[i,j]]]
             max = np.max(self.internal)
-            grey = (self.internal[i,j]/max,self.internal[i,j]/max,self.internal[i,j]/max,1)
-            colors=((grey for direc in self.lines[self.active[i,j]])),
+            for _ in range(int(self.external[i,j]*10)):
+               x.append(j)
+               y.append(i)
+            grey = (1-self.internal[i,j]/max,1-self.internal[i,j]/max,1-self.internal[i,j]/max,1)
+            colors=np.asarray([grey for direc in self.lines[self.active[i,j]]])
             ax.add_collection(mc.LineCollection(lst, colors=colors,linewidths=2))
 
       # for making hex dot grid
@@ -279,7 +283,7 @@ class Model:
       # y = y*math.sqrt(3)/2
       # ax.scatter(y,x)
 
-      ax.autoscale()
+      # ax.hexbin(x,y)
       ax.margins(0.1)
       # plt.draw()
 
@@ -287,7 +291,7 @@ model = Model()
 fig, ax = plt.subplots()
 plt.ion()
 model.display(ax)
-for i in range(10):
+for i in range(20):
    plt.pause(0.2)
    model.update()
    model.display(ax)
