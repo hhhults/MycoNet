@@ -49,7 +49,7 @@ hexDirecs = ((np.array([0,1]),np.array([-1,0]), np.array([-1,-1]),np.array([0,-1
 
 class Model:
 
-   def __init__(self,n=30):
+   def __init__(self,n=15):
       self.size = n
       self.lines = []
       self.makeLines()
@@ -62,20 +62,21 @@ class Model:
       # self.c3 = 1e2
       # self.c4 = 1e-8
       # self.c5 = 1e-9
-      self.Dp = 0.3
-      self.Di = 0.1
-      self.Da = 0.1
-      self.v = 1
-      self.b = 2
-      self.c1 = 0.03
-      self.c2 = 0.01
-      self.c3 = 0.05
-      self.c4 = 0.001
-      self.c5 = 0.001
+      self.Dp = 0.3          # coefficient of diffusive movement
+      self.Di = 0.1          # coefficient of diffusive transport
+      self.Da = 0.1          # coefficient of active transport
+      self.v = 1             # coefficient of active movement
+      self.b = 2             # branching coefficient
+      self.c1 = 0.03         # coefficient for internal gain of nutreint through uptake
+      self.c2 = 0.01         # growth cost coefficient
+      self.c3 = 0.05         # coefficient for environmental loss of nutrient through uptake
+      self.c4 = 0.001        # active translocation cost coefficient
+      self.c5 = 0.001        # coefficient for nutrient loss from hyphal maintenance
+      self.omega = 1e-13     # minimum substrate in active hypha
+
       self.zero = np.zeros((n+4,n+4))
       self.one = np.ones((n+4,n+4))
       self.external_init = 1.5*math.sqrt(3)*1e-5#1e-11
-      self.omega = 1e-13
       self.precision = np.float16
       self.active = np.zeros((n+4,n+4),dtype=np.int8)
       self.active[1+(n//2),1+(n//2)] = 1
@@ -228,7 +229,6 @@ class Model:
       # subtract the nutrients we absorb from the environment
       self.external -= self.c3 * self.internal * num
 
-
    def translocate(self):
 
       # for each direction of adjacent cells
@@ -268,10 +268,10 @@ class Model:
          for j in range(2,self.size+2):
             pt = np.array([i*sqrt3half, (j+0.5) if i%2==1 else j])
             lst = [(pt,pt+direc) for direc in self.lines[self.active[i,j]]]
-            # max = np.max(self.internal)
-            # grey = (self.internal[i,j]/max,self.internal[i,j]/max,self.internal[i,j]/max,1)
-            # colors=((grey for direc in self.lines[self.active[i,j]])),
-            ax.add_collection(mc.LineCollection(lst, linewidths=2))
+            max = np.max(self.internal)
+            grey = (self.internal[i,j]/max,self.internal[i,j]/max,self.internal[i,j]/max,1)
+            colors=((grey for direc in self.lines[self.active[i,j]])),
+            ax.add_collection(mc.LineCollection(lst, colors=colors,linewidths=2))
 
       # for making hex dot grid
       # x,y = np.mgrid[0:self.size+4,0:self.size+4]
