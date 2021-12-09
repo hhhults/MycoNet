@@ -4,7 +4,6 @@ import numpy.random as rand
 import random
 from matplotlib import collections  as mc
 import math
-import matplotlib.pyplot as plt
 
 """An implementation of a model for a mycelial network.
 Based off the one formulated in "The Development of Fungal Networks in Complex
@@ -49,21 +48,13 @@ hexDirecs = ((np.array([0,1]),np.array([-1,0]), np.array([-1,-1]),np.array([0,-1
 (np.array([0,1]), np.array([-1,1]), np.array([-1,0]), np.array([0,-1]), np.array([1,0]), np.array([1,1])))
 
 class Model:
-
+   defaultParams = [0.3, 1, 0.1,0.1,0.6,0.015,0.2,0.05,0.05,0.01]
    def __init__(self,params,n=15, timeSteps=20):
       self.size = n
       self.lines = []
       self.timeSteps = timeSteps
       self.makeLines()
       self.dx = 1
-      # self.Dp = 1e4
-      # self.v = 1e5
-      # self.b = 1e6
-      # self.c1 = 10
-      # self.c2 = 1e-7
-      # self.c3 = 1e2
-      # self.c4 = 1e-8
-      # self.c5 = 1e-9
       
       self.Dp = params[0]          # coefficient of diffusive movement
       self.v = params[1]             # coefficient of active movement
