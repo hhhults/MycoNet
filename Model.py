@@ -50,7 +50,7 @@ hexDirecs = ((np.array([0,1]),np.array([-1,0]), np.array([-1,-1]),np.array([0,-1
 
 class Model:
 
-   def __init__(self,params,n, timeSteps=20):
+   def __init__(self,params,n=15, timeSteps=20):
       self.size = n
       self.lines = []
       self.timeSteps = timeSteps
