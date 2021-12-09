@@ -108,38 +108,29 @@ class Model:
 
       Notes:
          -- Branching is included within grow()."""
-      print("\nentering update\n")
-      print(self.internal)
-      # print(self.internal)
-      print(self.external)
+
+
+
+
       self.refill_source()
-      # print("before fixed %f" % self.dt)
+
       self.fix_dt()
-      # print("after fixed %f" % self.dt)
-      print("\nuptake\n")
+
+
       self.uptake()
-      print(self.internal)
-      print(self.external)
-      print("\ngrow\n")
+
 
       self.grow()
-      print(self.internal)
-      print(self.external)
-      print("\nmaintain\n")
+
       self.maintain()
-      print(self.internal)
-      print(self.external)
-      print("\ntranslocate\n")
-      # self.translocate()
-      print(self.internal)
-      print(self.external)
+
+      self.translocate()
+
 
    def fix_dt(self):
       if (val:=np.max(self.internal)) <=0: 
-         print("here")
          return
       if (val*(3*self.Dp+self.v))*self.dt>1: 
-         print("printing val %f"%val)
          self.dt = 1/val
 
    def grow(self):
@@ -231,9 +222,6 @@ class Model:
       # self.active[new_inactive] = 0
 
       # self.tips[new_inactive] = 0
-      # # anastosmosis
-      # # for i in range(6):
-      # #    self.tips = np.where(np.any(self.active[np.where(self.orientation==i)]==np.setdiff1d(2**np.arange(7),2**i), axis=0),0,self.tips)
 
 
    def branch(self, tips_masked):
@@ -276,8 +264,6 @@ class Model:
    def translocate(self):
 
       # for each direction of adjacent cells
-         # print(self.tips)
-         # print("\n\n\n")
       for j in range(2, self.size+2):
          for i in range(2, self.size+2):
             for theta in range(6):
@@ -286,8 +272,8 @@ class Model:
                if ((self.active[i,j] | 2**theta)==2**theta) and ((self.active[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] | 2**((theta+3)%6))==2**((theta+3)%6)):
 
                   # passive translocation
-                  self.internal[i,j]+=self.Di*(self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-self.internal[i,j])#*self.dx**(-2)
-                  # self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-=val
+                  #self.internal[i,j]+#*self.dx**(-2)
+                  self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-=self.Di*(self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-self.internal[i,j])
 
                   # active translocation
                   if (self.tips[i,j]-self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]])>0:
