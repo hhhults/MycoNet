@@ -301,9 +301,6 @@ class Model:
       self.internal = np.where(self.internal<0,0,self.internal)
       self.external = np.where(self.external<0,0,self.external)
 
-   def get_total_length(self):
-      return np.sum(self.count_ones(self.active))
-
    def refill_source(self):
       self.external[1+(self.size//2),1+(self.size//2)] = self.external_init
 

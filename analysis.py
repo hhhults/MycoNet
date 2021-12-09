@@ -18,20 +18,36 @@ def plot_avg_length_vs_time(params,iterations=10,n=15,timesteps=20):
    data = np.zeros((iterations,timesteps))
    for it in range(iterations):
       model = m.Model(params,n=n, timeSteps=timesteps)
-      data[it,0] = model.get_total_length()
+      data[it,0] = get_total_length(model)
       for t in range(1,timesteps):
          model.update()
-         data[it,t] = model.get_total_length()
+         data[it,t] = get_total_length(model)
    plt.plot(np.arange(timesteps), np.mean(data,axis=0))
    plt.show()
 
+def plot_avg_density_vs_time(params,iterations=10,n=15,timesteps=20):
+   data = np.zeros((iterations,timesteps))
+   for it in range(iterations):
+      model = m.Model(params,n=n, timeSteps=timesteps)
+      data[it,0] = get_mean_length(model)
+      for t in range(1,timesteps):
+         model.update()
+         data[it,t] = get_mean_length(model)
+   plt.plot(np.arange(timesteps), np.mean(data,axis=0))
+   plt.show()
+
+def get_total_length(model):
+   return np.sum(model.count_ones(model.active))
+
+def get_mean_length(model):
+   return np.ma.mean(np.ma.masked_less(model.count_ones(model.active),1))
    
 #        Dp v Di Da b c1 c2 c3 c4 c5
-params = [1e4, 1e5, 2, 1, 1e6, 10, 1e-7, 0.001, 1e-8, 1e-9]
+params = [1e4, 1e5, 2, 1, 1e6, 10, 1e-7, 0.001, 1e-8, 1e-9] # from paper`
 
 params = [0.3, 1, 0.1,0.1,0.6,0.015,0.2,0.05,0.05,0.01]
 
-plot_avg_length_vs_time(params)
-# make_display(params,n=30, timesteps=30)
+# plot_avg_density_vs_time(params,n=30,timesteps=30)
+make_display(params,n=15, timesteps=70)
       
 
