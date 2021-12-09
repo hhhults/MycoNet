@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.core.numeric import isclose
 import numpy.random as rand
 import random
 from matplotlib import collections  as mc
@@ -49,9 +50,10 @@ hexDirecs = ((np.array([0,1]),np.array([-1,0]), np.array([-1,-1]),np.array([0,-1
 
 class Model:
 
-   def __init__(self,n=15):
+   def __init__(self,params,n=15, timeSteps=20):
       self.size = n
       self.lines = []
+      self.timeSteps = timeSteps
       self.makeLines()
       self.dx = 1
       # self.Dp = 1e4
@@ -62,17 +64,17 @@ class Model:
       # self.c3 = 1e2
       # self.c4 = 1e-8
       # self.c5 = 1e-9
-      self.Dp = 0.3          # coefficient of diffusive movement
-      self.v = 1             # coefficient of active movement
-
-      self.Di = 0.1          # coefficient of diffusive transport
-      self.Da = 0.1          # coefficient of active transport
-      self.b = 1.5            # branching coefficient
-      self.c1 = 0.015         # coefficient for internal gain of nutrient through uptake
-      self.c2 = 0.2         # growth cost coefficient
-      self.c3 = 0.05         # coefficient for environmental loss of nutrient through uptake
-      self.c4 = 0.05        # active translocation cost coefficient
-      self.c5 = 0.01        # coefficient for nutrient loss from hyphal maintenance
+      
+      self.Dp = params[0]          # coefficient of diffusive movement
+      self.v = params[1]             # coefficient of active movement
+      self.Di = params[2]          # coefficient of diffusive transport
+      self.Da = params[3]      # coefficient of active transport
+      self.b = params[4]           # branching coefficient
+      self.c1 = params[5]         # coefficient for internal gain of nutrient through uptake
+      self.c2 = params[6]         # growth cost coefficient
+      self.c3 = params[7]         # coefficient for environmental loss of nutrient through uptake
+      self.c4 = params[8]        # active translocation cost coefficient
+      self.c5 = params[9]        # coefficient for nutrient loss from hyphal maintenance
       self.omega = 1e-13     # minimum substrate in active hypha
 
       self.zero = np.zeros((n+4,n+4))
@@ -84,14 +86,17 @@ class Model:
       self.inactive = np.zeros((n+4,n+4),dtype=np.int8)
       self.tips = np.zeros((n+4,n+4),dtype=np.int8)
       self.tips[(n//2)+1,(n//2)+1] = 1
-      self.orientation = np.where(self.tips,np.mod(np.log2(self.active)+3,6),-1)
-      self.inCell = np.zeros((n,n),dtype=np.int8)
-      self.internal = np.ones((n+4,n+4),dtype=self.precision)
+      self.orientation = np.where(np.logical_and(self.tips, np.logical_not(np.isclose(self.active,0))),np.mod(np.log2(self.active)+3,6),-1)
+      self.internal = np.zeros((n+4,n+4),dtype=self.precision)
+      self.internal[1+(n//2),1+(n//2)] = 1
       self.external = np.ones((n+4,n+4),dtype=self.precision)*self.external_init
-      self.dt = 0.5
+      self.dt = 0.8
 
-   # from https://stackoverflow.com/questions/8871204/count-number-of-1s-in-binary-representation
    def count_ones(self, n):
+      """Counts the number of ones in the binary representation of a decimal number.
+      Written to take a numpy array of decimal ints and return an numpy array of counts
+      Algorithm for counting is from https://stackoverflow.com/questions/8871204/count-number-of-1s-in-binary-representation
+      """
       count=np.zeros(n.shape)
       while np.sum(self.one[(remaining:=np.where(n!=0))])>0:
          n[remaining] = n[remaining]&(n[remaining]-1)
@@ -99,17 +104,52 @@ class Model:
       return count
 
    def update(self):
-      model.uptake()
-      model.grow()
-      model.maintain()
-      model.translocate()
+      """Carries out the main functions of a mycorrhizal network.
+
+      Notes:
+         -- Branching is included within grow()."""
+      print("\nentering update\n")
+      print(self.internal)
+      # print(self.internal)
+      print(self.external)
+      self.refill_source()
+      # print("before fixed %f" % self.dt)
+      self.fix_dt()
+      # print("after fixed %f" % self.dt)
+      print("\nuptake\n")
+      self.uptake()
+      print(self.internal)
+      print(self.external)
+      print("\ngrow\n")
+
+      self.grow()
+      print(self.internal)
+      print(self.external)
+      print("\nmaintain\n")
+      self.maintain()
+      print(self.internal)
+      print(self.external)
+      print("\ntranslocate\n")
+      # self.translocate()
+      print(self.internal)
+      print(self.external)
+
+   def fix_dt(self):
+      if (val:=np.max(self.internal)) <=0: 
+         print("here")
+         return
+      if (val*(3*self.Dp+self.v))*self.dt>1: 
+         print("printing val %f"%val)
+         self.dt = 1/val
 
    def grow(self):
-
       # print(self.internal)
+      #print(self.tips)
 
+      """Cause each hyphal tip to grow in a straight line or turn with some chance.
+      Also calls branch() which causes one hyphal tip to spontaneously split into two."""
       # calculate movement probabilities from internal substrate concentrations
-      movementDensity = np.array([diffusion:=self.Dp*self.internal*self.dt*self.dx**(-2), 2*diffusion+(convection:=self.v*self.internal*self.dt*self.dx**(-1)), 3*diffusion+convection])
+      movementDensity = np.array([diffusion:=self.Dp*self.internal*self.dt, 2*diffusion+(convection:=self.v*self.internal*self.dt), 3*diffusion+convection])
       
       # generate random numbers
       probs = rand.rand(self.size+4,self.size+4)
@@ -149,7 +189,7 @@ class Model:
 
                   # add a tip to the adjacent cell in the theta direction
                   self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] += 1
-
+                  self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] = self.external[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]
                   self.internal[i,j] -= self.c2 * self.dx # use up nutrient
 
          # self.tips[2 + hexDirecs[i][0] : self.size + 2 + hexDirecs[theta][0],
@@ -169,6 +209,8 @@ class Model:
             for i in range(2, self.size+2):
                if tips_masked[i,j] == 1:
                   self.active[i+hexDirecs[i&1][theta][0], j+hexDirecs[i&1][theta][1]] |= (othernum:=(2**((theta+3)%6)))
+
+      self.fix_substrate_levels()
       
 
    def maintain(self):
@@ -177,17 +219,18 @@ class Model:
       self.tips = np.where(cond:=self.tips>1, 1, self.tips)
 
       # where there are tips get the orientation of those tips, no tip -> -1
-      self.orientation = np.where(self.tips,np.mod(np.log2(self.active)+3,6),-1)
+      self.orientation = np.where(np.logical_and(self.tips, np.logical_not(np.isclose(self.active,0))),np.mod(np.log2(self.active)+3,6),-1)
 
       # it costs nutrients to be a hypha! deduct for each in cell.
-      # self.internal[cond] -= self.c5*self.count_ones(self.active[(cond:=np.where(self.active!=0))])
+      #self.internal[cond] -= self.c5*self.count_ones(self.active[(cond:=np.where(self.active!=0))])
 
+      # self.internal[(new_inactive:=np.where(self.internal<self.omega))] = self.omega
 
-      self.internal[(new_inactive:=np.where(self.internal<self.omega))] = self.omega
+      # self.inactive[new_inactive] = self.active[new_inactive]
 
-      self.inactive[new_inactive] = self.active[new_inactive]
+      # self.active[new_inactive] = 0
 
-      self.active[new_inactive] = 0
+      # self.tips[new_inactive] = 0
       # # anastosmosis
       # # for i in range(6):
       # #    self.tips = np.where(np.any(self.active[np.where(self.orientation==i)]==np.setdiff1d(2**np.arange(7),2**i), axis=0),0,self.tips)
@@ -216,6 +259,9 @@ class Model:
                # make new tip in adjacent hex in that direction
                self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] += 1
 
+               self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] = self.external[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]
+
+
                # make hypha in this cell and adjacent cell in that direction
                self.active[i,j] |= (2**theta)
                self.active[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] |= (2**((theta+3)%6))
@@ -230,35 +276,50 @@ class Model:
    def translocate(self):
 
       # for each direction of adjacent cells
-      for theta in range(6):
-         for j in range(2, self.size+2):
-            for i in range(2, self.size+2):
+         # print(self.tips)
+         # print("\n\n\n")
+      for j in range(2, self.size+2):
+         for i in range(2, self.size+2):
+            for theta in range(6):
 
                # if there's hyphae connecting this cell to the adjacent cell in direction theta
-               if (self.active[i,j] | 2**theta==2**theta) and (self.active[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] | 2**((theta+3)%6)==2**((theta+3)%6)):
+               if ((self.active[i,j] | 2**theta)==2**theta) and ((self.active[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] | 2**((theta+3)%6))==2**((theta+3)%6)):
 
                   # passive translocation
-                  self.internal[i,j]+=self.Di*(self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-self.internal[i,j])*self.dx**(-2)
+                  self.internal[i,j]+=self.Di*(self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-self.internal[i,j])#*self.dx**(-2)
+                  # self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]-=val
 
                   # active translocation
-                  if self.tips[i,j]-self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]>0:
-                     m = self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] * self.Da * self.dt * self.dx**(-2)
+                  if (self.tips[i,j]-self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]])>0:
+                     m = self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] * self.Da * self.dt# * self.dx**(-2)
                      self.internal[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]] -= m * self.c4
-                  elif self.tips[i,j]-self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]]<0:
-                     m = self.internal[i,j] * self.Da * self.dt * self.dx**(-2)
+                  elif (self.tips[i,j]-self.tips[i+hexDirecs[i&1][theta][0],j+hexDirecs[i&1][theta][1]])<0:
+                     m = self.internal[i,j] * self.Da * self.dt# * self.dx**(-2)
                      self.internal[i,j] -= m * self.c4
                   else:
                      m = 0
                   self.internal[i,j]+=m
+               self.fix_substrate_levels()
+
 
    # create hash table
    def makeLines(self):
       for m in range(64):
          line = []
          for i in range(6):
-            if m&2**i==2**i:
+            if (m&2**i)==(2**i):
                line.append(direcs[i])
          self.lines.append(line)
+
+   def fix_substrate_levels(self):
+      self.internal = np.where(self.internal<0,0,self.internal)
+      self.external = np.where(self.external<0,0,self.external)
+
+   def get_total_length(self):
+      return np.sum(self.count_ones(self.active))
+
+   def refill_source(self):
+      self.external[1+(self.size//2),1+(self.size//2)] = self.external_init
 
    # display
    def display(self, ax):
@@ -269,6 +330,7 @@ class Model:
          for j in range(2,self.size+2):
             pt = np.array([i*sqrt3half, (j+0.5) if i%2==1 else j])
             lst = [(pt,pt+direc) for direc in self.lines[self.active[i,j]]]
+            lstInactive = [(pt,pt+direc) for direc in self.lines[self.inactive[i,j]]]
             max = np.max(self.internal)
             for _ in range(int(self.external[i,j]*10)):
                x.append(j)
@@ -276,6 +338,7 @@ class Model:
             grey = (1-self.internal[i,j]/max,1-self.internal[i,j]/max,1-self.internal[i,j]/max,1)
             colors=np.asarray([grey for direc in self.lines[self.active[i,j]]])
             ax.add_collection(mc.LineCollection(lst, colors=colors,linewidths=2))
+            ax.add_collection(mc.LineCollection(lstInactive,linewidths=2))
 
       # for making hex dot grid
       # x,y = np.mgrid[0:self.size+4,0:self.size+4]
@@ -286,15 +349,6 @@ class Model:
       # ax.hexbin(x,y)
       ax.margins(0.1)
       # plt.draw()
-
-model = Model()
-fig, ax = plt.subplots()
-plt.ion()
-model.display(ax)
-for i in range(20):
-   plt.pause(0.2)
-   model.update()
-   model.display(ax)
 
 
 
